@@ -18,18 +18,19 @@ import ai_helper
 
 
 def navegar_a_plataforma(page: Page) -> bool:
-    """Navega a la página principal y verifica que hay sesión activa."""
+    """Navega a la página principal de Blackboard Ultra y verifica sesión."""
     print("[NAV] Accediendo a la plataforma UPC...")
-    page.goto(config.PLATAFORMA_URL, timeout=config.TIMEOUT_NAVEGACION)
+    page.goto(config.PLATAFORMA_HOME, timeout=config.TIMEOUT_NAVEGACION)
     page.wait_for_load_state("domcontentloaded")
+    page.wait_for_timeout(3000)  # Blackboard Ultra tarda en cargar SPA
 
     # Verificar si hay sesión activa (no redirigió a login)
     url_actual = page.url.lower()
     if "login" in url_actual or "auth" in url_actual:
-        print("[NAV] ⚠ No hay sesión activa. Inicia sesión manualmente en Chrome primero.")
+        print("[NAV] No hay sesión activa. Inicia sesión manualmente en Chrome primero.")
         return False
 
-    print("[NAV] Sesión activa detectada.")
+    print(f"[NAV] Sesión activa. URL: {page.url}")
     return True
 
 
@@ -43,22 +44,10 @@ def buscar_curso(page: Page, nombre_curso: str) -> bool:
     """
     print(f"[NAV] Buscando curso: '{nombre_curso}'")
 
-    # [AJUSTAR] URL de lista de cursos en Blackboard UPC
-    # Blackboard típico: /ultra/institution-page / /webapps/portal/execute/tabs/tabAction
-    urls_intentar = [
-        f"{config.PLATAFORMA_URL}/ultra/institution-page",
-        f"{config.PLATAFORMA_URL}/ultra/course",
-        f"{config.PLATAFORMA_URL}/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_2_1",
-        config.PLATAFORMA_URL,
-    ]
-
-    for url in urls_intentar:
-        try:
-            page.goto(url, timeout=config.TIMEOUT_NAVEGACION)
-            page.wait_for_load_state("domcontentloaded")
-            break
-        except Exception:
-            continue
+    # Navegar a la página principal de Blackboard Ultra
+    page.goto(config.PLATAFORMA_HOME, timeout=config.TIMEOUT_NAVEGACION)
+    page.wait_for_load_state("domcontentloaded")
+    page.wait_for_timeout(3000)
 
     # [AJUSTAR] Buscar campo de búsqueda y escribir el nombre del curso
     # Blackboard Ultra tiene un buscador en la página principal

@@ -19,8 +19,12 @@ DIRECTORIO_DESCARGAS = "E:\\RPA_Descargas"
 CHROME_USER_DATA_DIR = r"C:\Users\Master PC\AppData\Local\Google\Chrome\User Data"
 CHROME_PROFILE = "Profile 4"
 
-# --- Plataforma educativa UPC ---
+# --- Plataforma educativa UPC (Blackboard Ultra) ---
 PLATAFORMA_URL = "https://aulavirtual.upc.edu.pe"
+PLATAFORMA_HOME = "https://aulavirtual.upc.edu.pe/ultra/institution-page"
+
+# --- Receta de navegación (se genera con teach.py) ---
+RECIPE_PATH = os.path.join(BASE_DIR, "recipe.json")
 
 # --- OpenAI ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
