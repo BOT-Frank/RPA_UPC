@@ -12,6 +12,9 @@ RPA_UPC/
 ├── downloader.py        # Descarga y organización en disco E:
 ├── db.py                # SQLite — registro de cursos y descargas
 ├── ai_helper.py         # Integración GPT-4o-mini (match cursos, clasificación)
+├── teach.py             # Modo enseñanza — guía al bot paso a paso por terminal
+├── recipe.json          # Receta de navegación (se genera con teach.py)
+├── screenshots/         # Capturas del modo enseñanza (no se sube a git)
 ├── requirements.txt     # Dependencias Python
 ├── .env                 # API key de OpenAI (NO se sube a git)
 ├── .env.example         # Plantilla del .env
@@ -101,7 +104,49 @@ La configuración ya apunta al perfil correcto:
 2. Navega a `aulavirtual.upc.edu.pe` y verifica que estás logueado
 3. **Cierra TODAS las ventanas de Chrome**
 
-## Paso 4: Ejecutar
+## Paso 4: Modo Enseñanza (PRIMERA VEZ — obligatorio)
+
+Antes de ejecutar `main.py`, debes enseñarle al bot cómo navegar la plataforma:
+
+```bash
+python teach.py
+```
+
+Se abre Chrome y tú guías por terminal paso a paso:
+
+```
+🎯 ¿Qué hago? > listar              ← Ve los enlaces de la página
+🎯 ¿Qué hago? > screenshot          ← Captura de pantalla (screenshots/)
+🎯 ¿Qué hago? > click Cursos        ← Click en enlace con texto "Cursos"
+🎯 ¿Qué hago? > guardar ir_a_cursos ← Graba este paso en recipe.json
+🎯 ¿Qué hago? > listar              ← Ve cursos disponibles
+🎯 ¿Qué hago? > click MARKETING...  ← Entra al curso
+🎯 ¿Qué hago? > guardar dentro_curso
+🎯 ¿Qué hago? > click Grabaciones   ← Navega a grabaciones
+🎯 ¿Qué hago? > guardar grabaciones
+🎯 ¿Qué hago? > salir               ← Guarda recipe.json y cierra
+```
+
+**Comandos de teach.py:**
+
+| Comando | Qué hace |
+|---------|----------|
+| `screenshot` / `ss` | Captura de pantalla |
+| `click TEXTO` | Click en elemento con ese texto |
+| `clicksel CSS` | Click en selector CSS específico |
+| `listar` | Lista todos los enlaces visibles |
+| `listar-btn` | Lista todos los botones |
+| `html` | Muestra estructura del DOM |
+| `url URL` | Navega a una URL |
+| `scroll` | Baja la página |
+| `esperar N` | Espera N segundos |
+| `guardar NOMBRE` | Guarda el paso en `recipe.json` |
+| `receta` | Muestra pasos guardados |
+| `info` | URL y título actual |
+| `selector TEXTO` | Busca elementos que contienen un texto |
+| `salir` | Guarda y cierra |
+
+## Paso 5: Ejecutar el proceso automático
 
 ```bash
 # Procesar todos los cursos pendientes
