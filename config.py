@@ -3,36 +3,45 @@ Configuración central del sistema RPA.
 Modificar estas variables según el entorno local.
 """
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Rutas ---
-# Ruta al PDF con los nombres de los cursos
-PDF_CURSOS = os.path.join(os.path.dirname(__file__), "cursos.pdf")
+BASE_DIR = os.path.dirname(__file__)
+PDF_CICLOS_DIR = os.path.join(BASE_DIR, "PDF_Ciclos")
 
 # Directorio base de descargas (disco E:)
-# En Linux/Mac cambiar a una ruta válida, ej: "/mnt/e/RPA_Descargas"
 DIRECTORIO_DESCARGAS = "E:\\RPA_Descargas"
 
 # --- Chrome ---
-# Ruta al perfil de Chrome con sesión iniciada.
-# Windows típico: C:\Users\<usuario>\AppData\Local\Google\Chrome\User Data
-# El canal "chrome" usa la instalación del sistema.
-CHROME_USER_DATA_DIR = os.path.expanduser(
-    os.path.join("~", "AppData", "Local", "Google", "Chrome", "User Data")
-)
-CHROME_PROFILE = "Default"  # o "Profile 1", etc.
+# Perfil "Diseñador" = Profile 4
+CHROME_USER_DATA_DIR = r"C:\Users\Master PC\AppData\Local\Google\Chrome\User Data"
+CHROME_PROFILE = "Profile 4"
 
-# --- Plataforma educativa ---
-# URL base de la plataforma (ajustar según corresponda)
+# --- Plataforma educativa UPC ---
 PLATAFORMA_URL = "https://aulavirtual.upc.edu.pe"
-# URL de búsqueda de cursos (placeholder — ajustar al DOM real)
-BUSQUEDA_URL = f"{PLATAFORMA_URL}/course/search.php"
+
+# --- OpenAI ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = "gpt-4o-mini"  # Modelo económico para minimizar costos
 
 # --- Base de datos ---
-DB_PATH = os.path.join(os.path.dirname(__file__), "registro.db")
+DB_PATH = os.path.join(BASE_DIR, "registro.db")
 
 # --- Tiempos de espera (ms) ---
 TIMEOUT_NAVEGACION = 30_000
 TIMEOUT_DESCARGA = 120_000
 
 # --- Extensiones multimedia a buscar ---
-EXTENSIONES_MULTIMEDIA = {".mp4", ".mp3", ".webm", ".m3u8", ".pdf", ".pptx", ".docx"}
+EXTENSIONES_MULTIMEDIA = {".mp4", ".mp3", ".webm", ".m3u8", ".pdf", ".pptx", ".docx", ".xlsx", ".zip"}
+
+# --- Cursos a excluir (no son cursos descargables) ---
+CURSOS_EXCLUIR = {
+    "INDUCCION",
+    "MISION ACADEMICA EN DESALES UNIVERSITY, USA",
+    "MISION ACADEMICA A LA UNIVERSIDAD SANTO TOMAS",
+    "MISION ACADEMICA EN LA UNIVERSIDAD POLITECNICA DE CATALUÑA, ESPAÑA",
+    "MISIÓN ACADÉMICA EN LA UNIVERSIDAD DE SANTO TOMAS, COLOMBIA",
+    "TOPICOS EN GESTION DE SALUD 3",
+}

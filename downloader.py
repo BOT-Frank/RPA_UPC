@@ -1,6 +1,17 @@
 """
 Módulo de descarga de archivos.
-Descarga contenido multimedia y lo organiza en carpetas por curso en el disco E:.
+Descarga contenido multimedia y lo organiza en carpetas por ciclo y curso en el disco E:.
+
+Estructura de carpetas:
+  E:\RPA_Descargas\
+    Ciclo 1\
+      ETICA Y RESPONSABILIDAD SOCIAL\
+        archivo1.mp4
+        archivo2.pdf
+      CONTABILIDAD GERENCIAL\
+        ...
+    Ciclo 2\
+      ...
 """
 import os
 import re
@@ -9,79 +20,99 @@ import config
 import db
 
 
-def descargar_contenido(page: Page, curso_id: int, nombre_curso: str, enlaces: list[dict]) -> int:
+def descargar_contenido(
+    page: Page,
+    curso_id: int,
+    nombre_curso: str,
+    ciclo: str,
+    enlaces: list[dict],
+) -> int:
     """
-    Descarga cada enlace y lo guarda en E:\\RPA_Descargas\\<curso>\\.
+    Descarga cada enlace y lo guarda en E:\\RPA_Descargas\\<ciclo>\\<curso>\\.
     Retorna la cantidad de archivos descargados exitosamente.
     """
-    # Crear carpeta del curso (sanitizar nombre para Windows)
-    carpeta_curso = re.sub(r'[<>:"/\\|?*]', '_', nombre_curso)
-    ruta_curso = os.path.join(config.DIRECTORIO_DESCARGAS, carpeta_curso)
+    # Crear carpeta: E:\RPA_Descargas\Ciclo X\NOMBRE_CURSO\
+    carpeta_ciclo = _sanitizar_carpeta(ciclo)
+    carpeta_curso = _sanitizar_carpeta(nombre_curso)
+    ruta_curso = os.path.join(config.DIRECTORIO_DESCARGAS, carpeta_ciclo, carpeta_curso)
     os.makedirs(ruta_curso, exist_ok=True)
 
     descargados = 0
 
-    for enlace in enlaces:
+    for i, enlace in enumerate(enlaces, 1):
         url = enlace["url"]
         nombre_archivo = enlace["nombre"]
+        tipo = enlace.get("tipo", "desconocido")
 
-        # Verificación extra de duplicados
+        # Verificación de duplicados
         if db.ya_descargado(curso_id, url):
             print(f"  [SKIP] Ya descargado: {nombre_archivo}")
             continue
 
-        ruta_destino = os.path.join(ruta_curso, nombre_archivo)
+        ruta_destino = _ruta_unica(ruta_curso, nombre_archivo)
 
-        # Evitar sobreescribir archivos existentes en disco
-        if os.path.exists(ruta_destino):
-            base, ext = os.path.splitext(nombre_archivo)
-            contador = 1
-            while os.path.exists(ruta_destino):
-                ruta_destino = os.path.join(ruta_curso, f"{base}_{contador}{ext}")
-                contador += 1
+        print(f"  [{i}/{len(enlaces)}] Descargando: {nombre_archivo} ({tipo})")
 
-        try:
-            # Usar el mecanismo de descarga de Playwright
-            with page.expect_download(timeout=config.TIMEOUT_DESCARGA) as download_info:
-                # Navegar al enlace para iniciar la descarga
-                page.evaluate(f"() => window.open('{url}')")
+        # Intentar descarga con Playwright (evento download)
+        exito = _intentar_descarga_evento(page, url, ruta_destino)
 
-            download = download_info.value
-            download.save_as(ruta_destino)
+        # Fallback: descarga directa via HTTP
+        if not exito:
+            exito = _descarga_directa(page, url, ruta_destino)
 
-            # Registrar en base de datos
-            db.registrar_descarga(curso_id, url, ruta_destino)
+        if exito:
+            db.registrar_descarga(curso_id, url, ruta_destino, tipo)
             descargados += 1
-            print(f"  [OK] Descargado: {nombre_archivo}")
+            print(f"  [OK] Guardado en: {ruta_destino}")
+        else:
+            print(f"  [ERROR] No se pudo descargar: {nombre_archivo}")
 
-        except Exception as e:
-            # Si expect_download falla, intentar descarga directa via request
-            try:
-                descargado = _descarga_directa(page, url, ruta_destino)
-                if descargado:
-                    db.registrar_descarga(curso_id, url, ruta_destino)
-                    descargados += 1
-                    print(f"  [OK] Descargado (directo): {nombre_archivo}")
-                else:
-                    print(f"  [ERROR] No se pudo descargar: {nombre_archivo} — {e}")
-            except Exception as e2:
-                print(f"  [ERROR] Falló descarga directa: {nombre_archivo} — {e2}")
-
-    print(f"[DOWNLOAD] {descargados}/{len(enlaces)} archivos descargados para '{nombre_curso}'")
+    print(f"[DOWNLOAD] {descargados}/{len(enlaces)} archivos para '{nombre_curso}'")
     return descargados
 
 
-def _descarga_directa(page: Page, url: str, ruta_destino: str) -> bool:
-    """
-    Descarga un archivo usando el API de requests del contexto de Playwright.
-    Útil cuando el enlace no dispara el evento de descarga del navegador.
-    """
+def _intentar_descarga_evento(page: Page, url: str, ruta_destino: str) -> bool:
+    """Intenta descargar usando el evento de descarga de Playwright."""
     try:
-        response = page.context.request.get(url)
-        if response.ok:
+        with page.expect_download(timeout=config.TIMEOUT_DESCARGA) as download_info:
+            page.evaluate(f"() => window.open('{url}')")
+
+        download = download_info.value
+        download.save_as(ruta_destino)
+        return True
+    except Exception:
+        return False
+
+
+def _descarga_directa(page: Page, url: str, ruta_destino: str) -> bool:
+    """Descarga un archivo usando el API de requests del contexto de Playwright."""
+    try:
+        response = page.context.request.get(url, timeout=config.TIMEOUT_DESCARGA)
+        if response.ok and len(response.body()) > 0:
             with open(ruta_destino, "wb") as f:
                 f.write(response.body())
             return True
     except Exception:
         pass
     return False
+
+
+def _ruta_unica(carpeta: str, nombre_archivo: str) -> str:
+    """Genera una ruta única para evitar sobreescribir archivos existentes."""
+    ruta = os.path.join(carpeta, nombre_archivo)
+    if not os.path.exists(ruta):
+        return ruta
+
+    base, ext = os.path.splitext(nombre_archivo)
+    contador = 1
+    while os.path.exists(ruta):
+        ruta = os.path.join(carpeta, f"{base}_{contador}{ext}")
+        contador += 1
+    return ruta
+
+
+def _sanitizar_carpeta(nombre: str) -> str:
+    """Sanitiza nombre para usar como carpeta en Windows."""
+    nombre = re.sub(r'[<>:"/\\|?*]', '_', nombre)
+    nombre = nombre.strip('. ')
+    return nombre[:100] if nombre else "sin_nombre"
