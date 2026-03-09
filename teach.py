@@ -138,6 +138,71 @@ def main():
                 elif accion == "receta":
                     _mostrar_receta(receta)
 
+                elif accion == "escribir":
+                    # Escribir texto en un campo (ej: buscador)
+                    if not argumento:
+                        print("  Uso: escribir TEXTO")
+                        print("  Escribe en el elemento que tenga foco actualmente")
+                        continue
+                    page.keyboard.type(argumento, delay=50)
+                    page.wait_for_timeout(1000)
+                    print(f"  Escribí: '{argumento}'")
+
+                elif accion == "llenar":
+                    # Llenar un campo por su selector
+                    partes_llenar = argumento.split(" ", 1)
+                    if len(partes_llenar) < 2:
+                        print("  Uso: llenar SELECTOR TEXTO")
+                        print("  Ejemplo: llenar #courses-overview-filter-search MARKETING")
+                        continue
+                    sel, texto = partes_llenar
+                    page.locator(sel).first.click()
+                    page.wait_for_timeout(500)
+                    page.locator(sel).first.fill(texto)
+                    page.wait_for_timeout(2000)
+                    print(f"  Llené '{sel}' con: '{texto}'")
+
+                elif accion == "enter":
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(2000)
+                    print("  Enter presionado")
+                    _mostrar_info(page)
+
+                elif accion == "tecla":
+                    if not argumento:
+                        print("  Uso: tecla Tab / Escape / ArrowDown / etc.")
+                        continue
+                    page.keyboard.press(argumento)
+                    page.wait_for_timeout(500)
+                    print(f"  Tecla: {argumento}")
+
+                elif accion == "foco":
+                    # Mostrar qué elemento tiene el foco
+                    info_foco = page.evaluate("""() => {
+                        const el = document.activeElement;
+                        if (!el) return 'Ninguno';
+                        return {
+                            tag: el.tagName,
+                            id: el.id || '',
+                            type: el.type || '',
+                            placeholder: el.placeholder || '',
+                            class: (el.className || '').toString().substring(0, 50),
+                            text: (el.textContent || '').substring(0, 50)
+                        };
+                    }""")
+                    print(f"  Elemento con foco: {info_foco}")
+
+                elif accion == "inputs":
+                    # Listar todos los campos de entrada visibles
+                    _listar_inputs(page)
+
+                elif accion == "selector":
+                    # Identificar selector de un elemento a partir de texto/atributo
+                    if not argumento:
+                        print("  Uso: selector TEXTO_O_ID")
+                        continue
+                    _identificar_selector(page, argumento)
+
                 elif accion == "atras" or accion == "back":
                     page.go_back(timeout=15_000)
                     page.wait_for_timeout(2000)
@@ -157,6 +222,20 @@ def main():
                         _mostrar_info(page)
                     else:
                         print(f"  Tab {argumento} no existe")
+
+                elif accion == "hijos":
+                    # Ver hijos directos de un selector
+                    if not argumento:
+                        print("  Uso: hijos SELECTOR_CSS")
+                        continue
+                    _ver_hijos(page, argumento)
+
+                elif accion == "contenido":
+                    # Ver el HTML de un selector específico
+                    if not argumento:
+                        print("  Uso: contenido SELECTOR_CSS")
+                        continue
+                    _ver_contenido(page, argumento)
 
                 else:
                     print(f"  Comando desconocido: '{accion}'. Escribe 'ayuda' para ver opciones.")
@@ -182,35 +261,44 @@ _ultimo_listado = []  # Guarda el último listado de enlaces para clickn
 
 def _mostrar_ayuda():
     print("""
-  Navegación:
-    url URL          Navega a una dirección
-    atras            Página anterior
-    scroll [N]       Baja N pixeles (default 500)
-    scrollup [N]     Sube N pixeles
-    esperar N        Espera N segundos
+  NAVEGACION:
+    url URL            Navega a una dirección
+    atras              Página anterior
+    scroll [N]         Baja N pixeles (default 500)
+    scrollup [N]       Sube N pixeles
+    esperar N          Espera N segundos
 
-  Explorar:
-    listar / ls      Lista enlaces visibles (con números)
-    listar-btn / btn Lista botones visibles
-    buscar TEXTO     Busca elementos que contengan un texto
-    html             Muestra estructura del DOM
-    info / i         URL y título actual
-    screenshot / ss  Captura de pantalla
-    tabs             Lista pestañas abiertas
-    tab N            Cambia a pestaña N
+  EXPLORAR PAGINA:
+    listar / ls        Lista enlaces visibles (con números)
+    listar-btn / btn   Lista botones visibles
+    inputs             Lista campos de entrada (inputs, buscadores)
+    buscar TEXTO       Busca elementos por texto en la página
+    selector TEXTO     Encuentra el selector CSS de un elemento
+    html               Muestra estructura del DOM (inputs, iframes, nav)
+    contenido SEL      Ver HTML interno de un selector CSS
+    hijos SEL          Ver hijos directos de un selector
+    foco               Muestra qué elemento tiene el foco
+    info / i           URL y título actual
+    screenshot / ss    Captura de pantalla
+    tabs               Pestañas abiertas
+    tab N              Cambia a pestaña N
 
-  Interactuar:
-    click TEXTO      Click en elemento con ese texto
-    clickn N         Click en enlace #N del último 'listar'
-    clicksel CSS     Click en selector CSS
+  INTERACTUAR:
+    click TEXTO        Click en elemento con ese texto
+    clickn N           Click en enlace #N del último 'listar'
+    clicksel CSS       Click en selector CSS
+    llenar SEL TEXTO   Llena un input (ej: llenar #search MARKETING)
+    escribir TEXTO     Escribe texto en el elemento con foco
+    enter              Presiona Enter
+    tecla NOMBRE       Presiona tecla (Tab, Escape, ArrowDown...)
 
-  Receta:
-    guardar NOMBRE   Guarda paso actual en recipe.json
-    receta           Muestra pasos guardados
+  RECETA:
+    guardar NOMBRE     Guarda paso actual en recipe.json
+    receta             Muestra pasos guardados
 
-  Otros:
-    ayuda / h        Muestra esta ayuda
-    salir / q        Guarda receta y cierra
+  OTROS:
+    ayuda / h          Muestra esta ayuda
+    salir / q          Guarda receta y cierra
 """)
 
 
@@ -468,6 +556,177 @@ def _mostrar_receta(receta: dict):
         print(f"  {i}. [{p['nombre']}] — {p['url'][:60]}")
         if p.get("notas"):
             print(f"     Nota: {p['notas']}")
+
+
+def _listar_inputs(page):
+    """Lista todos los campos de entrada visibles con sus selectores."""
+    try:
+        inputs = page.evaluate("""() => {
+            const items = [];
+            document.querySelectorAll('input, textarea, select, [contenteditable="true"]').forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    let selector = el.tagName.toLowerCase();
+                    if (el.id) selector = '#' + el.id;
+                    else if (el.name) selector += '[name="' + el.name + '"]';
+                    else if (el.placeholder) selector += '[placeholder*="' + el.placeholder.substring(0, 20) + '"]';
+
+                    const label = document.querySelector('label[for="' + el.id + '"]');
+                    items.push({
+                        selector: selector,
+                        type: el.type || el.tagName.toLowerCase(),
+                        id: el.id || '',
+                        placeholder: el.placeholder || '',
+                        label: label ? label.textContent.trim() : '',
+                        value: (el.value || '').substring(0, 30),
+                        ariaLabel: el.getAttribute('aria-label') || ''
+                    });
+                }
+            });
+            return items;
+        }""")
+        print(f"\n  Campos de entrada ({len(inputs)}):")
+        print(f"  {'#':>3}  {'Label/Placeholder':<30} {'Selector':<40} Tipo")
+        print(f"  {'─'*3}  {'─'*30} {'─'*40} {'─'*10}")
+        for i, inp in enumerate(inputs, 1):
+            nombre = inp['label'] or inp['placeholder'] or inp['ariaLabel'] or '(sin nombre)'
+            print(f"  {i:3}  {nombre[:30]:<30} {inp['selector'][:40]:<40} {inp['type']}")
+            if inp['value']:
+                print(f"       valor actual: '{inp['value']}'")
+        if not inputs:
+            print("  (No se encontraron campos de entrada)")
+        else:
+            print(f"\n  Para llenar un campo: llenar SELECTOR TEXTO")
+            print(f"  Ejemplo: llenar {inputs[0]['selector']} mi texto")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+
+def _identificar_selector(page, texto: str):
+    """Encuentra el selector CSS más específico para un elemento dado un texto."""
+    try:
+        resultados = page.evaluate("""(buscar) => {
+            const results = [];
+            const all = document.querySelectorAll('*');
+            for (const el of all) {
+                const txt = (el.textContent || '').trim();
+                const ph = el.placeholder || '';
+                const aria = el.getAttribute('aria-label') || '';
+                const title = el.getAttribute('title') || '';
+                const id = el.id || '';
+
+                const match = [txt, ph, aria, title, id].some(v =>
+                    v.toLowerCase().includes(buscar.toLowerCase())
+                );
+                if (!match) continue;
+
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) continue;
+
+                // Generar selector
+                let sel = el.tagName.toLowerCase();
+                if (el.id) sel = '#' + el.id;
+                else if (el.getAttribute('data-testid')) sel += '[data-testid="' + el.getAttribute('data-testid') + '"]';
+                else if (el.getAttribute('role')) sel += '[role="' + el.getAttribute('role') + '"]';
+                else if (el.className && typeof el.className === 'string') {
+                    const cls = el.className.split(' ').filter(c => !c.includes('-0-2-'))[0];
+                    if (cls) sel += '.' + cls;
+                }
+
+                // Texto directo (no de hijos)
+                const directText = Array.from(el.childNodes)
+                    .filter(n => n.nodeType === 3)
+                    .map(n => n.textContent.trim())
+                    .join(' ').substring(0, 50);
+
+                results.push({
+                    selector: sel,
+                    tag: el.tagName,
+                    id: el.id || '',
+                    directText: directText,
+                    placeholder: ph,
+                    role: el.getAttribute('role') || '',
+                    href: (el.getAttribute('href') || '').substring(0, 60),
+                    type: el.type || '',
+                });
+                if (results.length >= 15) break;
+            }
+            return results;
+        }""", texto)
+
+        print(f"\n  Selectores para '{texto}' ({len(resultados)}):")
+        for r in resultados:
+            print(f"\n  • Selector: {r['selector']}")
+            print(f"    Tag: <{r['tag'].lower()}>", end="")
+            if r['id']:
+                print(f"  id='{r['id']}'", end="")
+            if r['role']:
+                print(f"  role='{r['role']}'", end="")
+            if r['type']:
+                print(f"  type='{r['type']}'", end="")
+            print()
+            if r['directText']:
+                print(f"    Texto: {r['directText']}")
+            if r['placeholder']:
+                print(f"    Placeholder: {r['placeholder']}")
+            if r['href']:
+                print(f"    Href: {r['href']}")
+        if not resultados:
+            print("  (No se encontraron elementos)")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+
+def _ver_hijos(page, selector: str):
+    """Muestra los hijos directos de un elemento por selector CSS."""
+    try:
+        hijos = page.evaluate("""(sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const items = [];
+            for (const child of el.children) {
+                const rect = child.getBoundingClientRect();
+                items.push({
+                    tag: child.tagName.toLowerCase(),
+                    id: child.id || '',
+                    class: (child.className || '').toString().substring(0, 40),
+                    text: (child.textContent || '').trim().substring(0, 60),
+                    href: (child.getAttribute('href') || '').substring(0, 50),
+                    visible: rect.width > 0 && rect.height > 0
+                });
+            }
+            return items;
+        }""", selector)
+
+        if hijos is None:
+            print(f"  Selector no encontrado: '{selector}'")
+            return
+
+        print(f"\n  Hijos de '{selector}' ({len(hijos)}):")
+        for i, h in enumerate(hijos, 1):
+            vis = "" if h['visible'] else " [oculto]"
+            print(f"  {i:3}. <{h['tag']}> {h['text'][:50]}{vis}")
+            if h['id']:
+                print(f"       id='{h['id']}'")
+            if h['href']:
+                print(f"       href='{h['href']}'")
+    except Exception as e:
+        print(f"  Error: {e}")
+
+
+def _ver_contenido(page, selector: str):
+    """Muestra el HTML interno de un selector (primeros 2000 chars)."""
+    try:
+        html = page.locator(selector).first.inner_html()
+        html_limpio = html[:2000]
+        print(f"\n  HTML de '{selector}':")
+        print(f"  {'-'*60}")
+        for linea in html_limpio.splitlines()[:40]:
+            print(f"  {linea}")
+        if len(html) > 2000:
+            print(f"  ... (truncado, total {len(html)} chars)")
+    except Exception as e:
+        print(f"  Error: {e}")
 
 
 if __name__ == "__main__":

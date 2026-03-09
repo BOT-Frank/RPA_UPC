@@ -49,35 +49,18 @@ def buscar_curso(page: Page, nombre_curso: str) -> bool:
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_timeout(3000)
 
-    # [AJUSTAR] Buscar campo de búsqueda y escribir el nombre del curso
-    # Blackboard Ultra tiene un buscador en la página principal
-    selectores_busqueda = [
-        "input[placeholder*='Buscar']",
-        "input[placeholder*='Search']",
-        "input[data-testid*='search']",
-        "input.search-input",
-        "input#search-field",
-        "#courseSearchBox",
-        "input[type='search']",
-    ]
-
-    campo = None
-    for selector in selectores_busqueda:
-        try:
-            campo = page.locator(selector).first
-            if campo.is_visible(timeout=3000):
-                break
-            campo = None
-        except Exception:
-            campo = None
-
-    if campo:
+    # Buscador de cursos — Blackboard Ultra (Material UI)
+    # Selector real: input#courses-overview-filter-search con label "Busque sus cursos"
+    campo = page.locator("input#courses-overview-filter-search").first
+    try:
+        campo.wait_for(timeout=10_000)
+        campo.click()
         campo.fill(nombre_curso)
-        campo.press("Enter")
-        page.wait_for_load_state("domcontentloaded")
-        page.wait_for_timeout(2000)  # Esperar resultados
-    else:
-        print("[NAV] No se encontró campo de búsqueda. Buscando en la lista directamente...")
+        # Blackboard Ultra filtra en tiempo real, esperar a que se actualice la lista
+        page.wait_for_timeout(3000)
+    except Exception as e:
+        print(f"[NAV] No se encontró el buscador de cursos: {e}")
+        return False
 
     # [AJUSTAR] Buscar el enlace al curso en los resultados
     # Blackboard muestra los cursos como enlaces con el nombre
